@@ -42,6 +42,7 @@ pub mod lite;  // The simple version
 pub mod fs;    // Full filesystem API
 pub mod marine; // Marine algorithm for salience detection!
 pub mod audio;  // Multi-format audio processing with temporal perspectives!
+pub mod audio_loader; // FLAC, WAV, and PCM file loading!
 #[cfg(feature = "fuse-mount")]
 pub mod mount; // FUSE mounting support
 

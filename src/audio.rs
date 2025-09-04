@@ -99,7 +99,7 @@ impl SampleRate {
 }
 
 /// Audio format configuration
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct AudioFormat {
     /// Sample rate
     pub sample_rate: SampleRate,
