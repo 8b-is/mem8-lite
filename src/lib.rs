@@ -46,6 +46,7 @@ pub mod audio_loader; // FLAC, WAV, and PCM file loading!
 pub mod mood_engine; // Music-mood correlation engine - how music changes us!
 pub mod mcp_server; // MCP server for LLM integration!
 pub mod tidal_dj; // Tidal streaming integration - AI DJ with real music!
+pub mod sensor_ingress; // Universal sensor fusion - from switches to consciousness!
 #[cfg(feature = "fuse-mount")]
 pub mod mount; // FUSE mounting support
 
