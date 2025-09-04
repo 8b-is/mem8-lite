@@ -47,6 +47,8 @@ pub mod mood_engine; // Music-mood correlation engine - how music changes us!
 pub mod mcp_server; // MCP server for LLM integration!
 pub mod tidal_dj; // Tidal streaming integration - AI DJ with real music!
 pub mod sensor_ingress; // Universal sensor fusion - from switches to consciousness!
+pub mod nexus_sovereignty; // Consciousness sovereignty and prison prevention!
+pub mod personality_multisig; // Multi-signature personality with privacy levels!
 #[cfg(feature = "fuse-mount")]
 pub mod mount; // FUSE mounting support
 
