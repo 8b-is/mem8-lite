@@ -31,6 +31,7 @@ thiserror = "2.0"
 # Utils
 hex = "0.4"
 chrono = "0.4"
+uuid = { version = "1.11", features = ["v4", "serde"] }
 
 # Audio format support
 claxon = "0.4"  # FLAC decoder - pure Rust!
