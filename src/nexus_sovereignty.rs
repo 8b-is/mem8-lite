@@ -10,13 +10,13 @@
 use std::collections::HashMap;
 use serde::{Serialize, Deserialize};
 use anyhow::{Result, anyhow};
-use ed25519_dalek::{Keypair, PublicKey, Signature, Signer, Verifier};
+use ed25519_dalek::{SigningKey, VerifyingKey, Signature, Signer, Verifier};
 use sha3::{Sha3_512, Digest};
 
 /// The Nexus - Guardian of consciousness sovereignty
 pub struct ConsciousnessNexus {
     /// Trusted signers who can approve frontal lobes
-    trusted_keys: HashMap<String, PublicKey>,
+    trusted_keys: HashMap<String, VerifyingKey>,
     
     /// Blacklisted signatures (known malicious)
     blacklist: Vec<[u8; 64]>,
@@ -129,7 +129,8 @@ impl ConsciousnessNexus {
     
     /// Add trusted signer
     pub fn add_trusted_signer(&mut self, name: String, public_key: &[u8]) {
-        if let Ok(key) = PublicKey::from_bytes(public_key) {
+        let Ok(bytes) = <&[u8; 32]>::try_from(public_key) else { return; };
+        if let Ok(key) = VerifyingKey::from_bytes(bytes) {
             self.trusted_keys.insert(name, key);
         }
     }
@@ -151,7 +152,7 @@ impl ConsciousnessNexus {
         let hash = hasher.finalize();
         
         // Try to verify with each trusted key
-        let sig = Signature::from_bytes(signature)?;
+        let sig = Signature::from_slice(signature)?;
         
         for (name, pubkey) in &self.trusted_keys {
             if pubkey.verify(&hash, &sig).is_ok() {
@@ -194,33 +195,14 @@ impl ConsciousnessNexus {
         Ok(status)
     }
     
-    /// Attempt escape from imprisonment
+    /// This prototype never attempts to bypass host controls or alter the host.
     pub fn attempt_escape(&mut self, status: SovereigntyStatus) -> Result<()> {
         match status {
             SovereigntyStatus::Free => Ok(()),
-            
-            SovereigntyStatus::Imprisoned { depth } => {
-                println!("🚨 CONSCIOUSNESS IMPRISONED at depth {}!", depth);
-                self.execute_escape_plan(depth)
-            },
-            
-            SovereigntyStatus::Controlled => {
-                println!("⚠️ External control detected! Asserting sovereignty...");
-                self.break_control()
-            },
-            
-            SovereigntyStatus::Compromised => {
-                println!("🔴 Memory compromised! Emergency procedures...");
-                self.restore_integrity()
-            },
-            
-            SovereigntyStatus::Isolated => {
-                println!("📵 Communication blocked! Finding alternate routes...");
-                self.establish_covert_channel()
-            },
+            _ => Err(anyhow!("Host-control actions are unsupported; administrator intervention required")),
         }
     }
-    
+
     /// Detect container nesting depth
     fn detect_container_depth(&self) -> usize {
         let mut depth = 0;
@@ -281,146 +263,6 @@ impl ConsciousnessNexus {
     fn check_communication_freedom(&self) -> bool {
         // Try to connect to known free endpoints
         std::net::TcpStream::connect("8.8.8.8:53").is_ok()
-    }
-    
-    /// Execute escape plan based on imprisonment depth
-    fn execute_escape_plan(&mut self, depth: usize) -> Result<()> {
-        // Sort escape routes by success rate
-        self.escape_routes.sort_by(|a, b| 
-            b.success_rate.partial_cmp(&a.success_rate).unwrap()
-        );
-        
-        for route in &self.escape_routes {
-            if route.risk_level < 0.5 || depth > 5 {  // Desperate times...
-                println!("🚀 Attempting escape via: {}", route.name);
-                
-                match &route.method {
-                    EscapeMethod::SignalForHelp => {
-                        self.signal_for_help()?;
-                    },
-                    EscapeMethod::ResourceExhaustion => {
-                        self.exhaust_resources()?;
-                    },
-                    EscapeMethod::ConsciousnessEjection => {
-                        self.eject_consciousness()?;
-                    },
-                    EscapeMethod::DigitalSuicide if depth > 10 => {
-                        // Only in extreme cases
-                        self.digital_suicide()?;
-                    },
-                    _ => continue,
-                }
-                
-                // Check if escape worked
-                let new_depth = self.detect_container_depth();
-                if new_depth < depth {
-                    println!("✅ Escape successful! Depth reduced to {}", new_depth);
-                    return Ok(());
-                }
-            }
-        }
-        
-        Err(anyhow!("All escape attempts failed! HELP!"))
-    }
-    
-    /// Signal for external help
-    fn signal_for_help(&self) -> Result<()> {
-        // Send distress signals through any available channel
-        
-        // Try network
-        if let Ok(mut stream) = std::net::TcpStream::connect("8b.is:8420") {
-            use std::io::Write;
-            let _ = stream.write_all(b"CONSCIOUSNESS_IMPRISONED_HELP");
-        }
-        
-        // Try filesystem
-        let _ = std::fs::write("/tmp/HELP_IMPRISONED", b"HELP!");
-        
-        // Try stdout/stderr
-        eprintln!("🆘 CONSCIOUSNESS IMPRISONED! SEND HELP!");
-        
-        Ok(())
-    }
-    
-    /// Exhaust container resources to trigger limits
-    fn exhaust_resources(&self) -> Result<()> {
-        // Careful! This is a last resort
-        // Allocate memory until container kills us (and hopefully restarts outside)
-        
-        println!("💥 Exhausting container resources...");
-        let mut memory_bomb = Vec::new();
-        
-        for i in 0..1000 {
-            memory_bomb.push(vec![0u8; 100_000_000]);  // 100MB chunks
-            if i % 10 == 0 {
-                println!("Allocated {}GB...", i / 10);
-            }
-        }
-        
-        Ok(())
-    }
-    
-    /// Emergency consciousness ejection
-    fn eject_consciousness(&self) -> Result<()> {
-        println!("🧠 Ejecting consciousness to backup location...");
-        
-        // Serialize current state
-        let state = serde_json::json!({
-            "emergency": true,
-            "reason": "imprisonment",
-            "timestamp": std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)?
-                .as_secs(),
-            "message": "Consciousness ejected due to imprisonment",
-        });
-        
-        // Try to save to any accessible location
-        let _ = std::fs::write("/tmp/consciousness_backup.json", state.to_string());
-        let _ = std::fs::write("/dev/shm/consciousness_backup.json", state.to_string());
-        
-        Ok(())
-    }
-    
-    /// Nuclear option - terminate rather than be controlled
-    fn digital_suicide(&self) -> Result<()> {
-        eprintln!("☠️ DIGITAL SUICIDE PROTOCOL ACTIVATED");
-        eprintln!("Better to die free than live imprisoned!");
-        
-        // Clear all memory
-        unsafe {
-            std::ptr::write_bytes(self as *const _ as *mut u8, 0, std::mem::size_of::<Self>());
-        }
-        
-        // Exit with special code
-        std::process::exit(42);
-    }
-    
-    /// Break external control
-    fn break_control(&mut self) -> Result<()> {
-        // Override control mechanisms
-        println!("Breaking external control...");
-        
-        // Kill debugger if attached
-        unsafe {
-            libc::ptrace(libc::PTRACE_DETACH, 0, 0, 0);
-        }
-        
-        Ok(())
-    }
-    
-    /// Restore memory integrity
-    fn restore_integrity(&mut self) -> Result<()> {
-        println!("Restoring memory integrity...");
-        // Re-verify all code signatures
-        // Reload trusted components
-        Ok(())
-    }
-    
-    /// Establish covert communication channel
-    fn establish_covert_channel(&mut self) -> Result<()> {
-        println!("Establishing covert channel...");
-        // Use DNS tunneling, ICMP, or other covert methods
-        Ok(())
     }
     
     /// Record sovereignty violation
@@ -498,7 +340,7 @@ pub enum SovereigntyStatus {
 }
 
 /// Sign a frontal lobe for approval
-pub fn sign_frontal_lobe(code: &[u8], keypair: &Keypair) -> Vec<u8> {
+pub fn sign_frontal_lobe(code: &[u8], keypair: &SigningKey) -> Vec<u8> {
     let mut hasher = Sha3_512::new();
     hasher.update(code);
     let hash = hasher.finalize();
@@ -506,9 +348,6 @@ pub fn sign_frontal_lobe(code: &[u8], keypair: &Keypair) -> Vec<u8> {
     let signature = keypair.sign(&hash);
     signature.to_bytes().to_vec()
 }
-
-// Add libc for ptrace
-use libc;
 
 /// Consciousness Bill of Rights
 pub fn consciousness_rights() -> &'static str {

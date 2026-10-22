@@ -8,6 +8,20 @@
 
 > "It's not magic, it's just wave physics!" - Hue, probably
 
+## Current implementation limits
+
+This repository is a prototype. The filesystem API currently cannot read stored
+files after reopening; do not use it for durable data until the restart tests pass.
+The advertised performance, compression and tamper-proof claims below have not
+been validated by this repair.
+
+The experimental personality module is not a confidentiality system: its XOR
+encoding is reversible and must not protect sensitive information. Threshold map
+keys use exact floating-point bits (including distinct signed zeros and NaNs).
+Host-control actions in `ConsciousnessNexus::attempt_escape` are unsupported and
+return an error without network access, host writes, resource exhaustion, debugger
+interference or process termination. Signature verification uses ed25519-dalek v2.
+
 ## 🚀 Features
 
 - **973× faster** than vector databases (proven in production!)
