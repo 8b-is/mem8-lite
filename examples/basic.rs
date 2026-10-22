@@ -38,7 +38,7 @@ fn simple_storage_demo() -> Result<()> {
     for msg in &messages {
         let sig = storage.store_string(msg)?;
         signatures.push(sig);
-        println!("📝 Stored: '{}' → {}", msg, &sig[..8]);
+        println!("📝 Stored: '{}' → {}", msg, hex::encode(&sig[..8]));
     }
     
     // Retrieve them back

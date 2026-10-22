@@ -10,8 +10,12 @@
 
 ## Current implementation limits
 
-This repository is a prototype. The filesystem API currently cannot read stored
-files after reopening; do not use it for durable data until the restart tests pass.
+This repository is a prototype. The filesystem API reconstructs a record-offset
+index on open and reads uncached data from the existing wave file format. Restart,
+overwrite/deletion and malformed-record regressions use temporary fixtures.
+Decoded bytes are checked against their content hash; this is not authentication.
+Power-loss recovery, atomic metadata updates and simultaneous independent writers
+are not covered; keep backups and do not rely on this prototype for critical data.
 The advertised performance, compression and tamper-proof claims below have not
 been validated by this repair.
 
@@ -35,13 +39,13 @@ interference or process termination. Signature verification uses ed25519-dalek v
 
 ```toml
 [dependencies]
-mem8-fs-lite = "0.1.0"
+mem8-fs-lite = "0.1.1"
 
 # Optional: Enable FUSE mounting
-mem8-fs-lite = { version = "0.1.0", features = ["fuse-mount"] }
+mem8-fs-lite = { version = "0.1.1", features = ["fuse-mount"] }
 
 # Optional: Async support
-mem8-fs-lite = { version = "0.1.0", features = ["async"] }
+mem8-fs-lite = { version = "0.1.1", features = ["async"] }
 ```
 
 ## 🎯 Quick Start

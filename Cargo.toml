@@ -1,6 +1,6 @@
 [package]
 name = "mem8-fs-lite"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["8b-is <dev@8b.is>"]
 description = "Lightning-fast wave-based filesystem - 973× faster storage without the consciousness"
