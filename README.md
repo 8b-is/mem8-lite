@@ -8,6 +8,24 @@
 
 > "It's not magic, it's just wave physics!" - Hue, probably
 
+## Current implementation limits
+
+This repository is a prototype. The filesystem API reconstructs a record-offset
+index on open and reads uncached data from the existing wave file format. Restart,
+overwrite/deletion and malformed-record regressions use temporary fixtures.
+Decoded bytes are checked against their content hash; this is not authentication.
+Power-loss recovery, atomic metadata updates and simultaneous independent writers
+are not covered; keep backups and do not rely on this prototype for critical data.
+The advertised performance, compression and tamper-proof claims below have not
+been validated by this repair.
+
+The experimental personality module is not a confidentiality system: its XOR
+encoding is reversible and must not protect sensitive information. Threshold map
+keys use exact floating-point bits (including distinct signed zeros and NaNs).
+Host-control actions in `ConsciousnessNexus::attempt_escape` are unsupported and
+return an error without network access, host writes, resource exhaustion, debugger
+interference or process termination. Signature verification uses ed25519-dalek v2.
+
 ## 🚀 Features
 
 - **973× faster** than vector databases (proven in production!)
@@ -21,13 +39,13 @@
 
 ```toml
 [dependencies]
-mem8-fs-lite = "0.1.0"
+mem8-fs-lite = "0.1.1"
 
 # Optional: Enable FUSE mounting
-mem8-fs-lite = { version = "0.1.0", features = ["fuse-mount"] }
+mem8-fs-lite = { version = "0.1.1", features = ["fuse-mount"] }
 
 # Optional: Async support
-mem8-fs-lite = { version = "0.1.0", features = ["async"] }
+mem8-fs-lite = { version = "0.1.1", features = ["async"] }
 ```
 
 ## 🎯 Quick Start

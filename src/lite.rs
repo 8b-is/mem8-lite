@@ -90,8 +90,12 @@ impl Mem8Lite {
     /// * `frequency` - Base frequency for wave encoding (1.618 is golden!)
     /// 
     /// # Example
-    /// ```
+    /// ```no_run
+    /// # fn main() -> anyhow::Result<()> {
+    /// use mem8_fs_lite::Mem8Lite;
     /// let storage = Mem8Lite::new("/tmp/my_waves.m8", 1.618)?;
+    /// # Ok(())
+    /// # }
     /// ```
     pub fn new<P: AsRef<Path>>(path: P, frequency: f64) -> Result<Self> {
         let path = path.as_ref().to_path_buf();

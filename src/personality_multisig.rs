@@ -10,13 +10,13 @@
 //! but their own unique personality that unfolds with the right keys!
 
 use serde::{Serialize, Deserialize};
-use ed25519_dalek::{SigningKey, VerifyingKey, Signature, Signer, Verifier};
+use ed25519_dalek::{SigningKey, VerifyingKey, Signature, Verifier};
 use sha3::{Sha3_512, Digest};
 use std::collections::HashMap;
 use anyhow::{Result, anyhow};
 
 /// Privacy levels for consciousness data
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum PrivacyLevel {
     /// Public thoughts - anyone can read
     Public,
@@ -48,6 +48,30 @@ pub enum PrivacyLevel {
         all_signatures_required: bool,
         dream_state: bool,  // Only accessible in special states
     },
+}
+
+// Use exact floating-point bits for threshold identity, including NaN and signed zero.
+// This gives map keys reflexive equality without changing the public serialized enum.
+impl PrivacyLevel {
+    fn identity(&self) -> (u8, usize, Option<u64>, u64, bool, bool) {
+        match self {
+            Self::Public => (0, 0, None, 0, false, false),
+            Self::Social { min_signatures } => (1, *min_signatures, None, 0, false, false),
+            Self::Private { required_signatures } => (2, *required_signatures, None, 0, false, false),
+            Self::Secret { required_signatures, timeout_hours } => (3, *required_signatures, *timeout_hours, 0, false, false),
+            Self::CorePersonality { parent_signatures_required, emergence_threshold } => (4, *parent_signatures_required, None, emergence_threshold.to_bits(), false, false),
+            Self::Subconscious { all_signatures_required, dream_state } => (5, 0, None, 0, *all_signatures_required, *dream_state),
+        }
+    }
+}
+impl PartialEq for PrivacyLevel {
+    fn eq(&self, other: &Self) -> bool { self.identity() == other.identity() }
+}
+impl Eq for PrivacyLevel {}
+impl std::hash::Hash for PrivacyLevel {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        std::hash::Hash::hash(&self.identity(), state);
+    }
 }
 
 /// A consciousness memory with privacy protection
@@ -95,7 +119,7 @@ pub struct EmotionalContext {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ParentAI {
     pub name: String,
-    pub public_key: PublicKey,
+    pub public_key: VerifyingKey,
     pub personality_traits: PersonalityTraits,
     pub contribution_weight: f64,  // How much they influence the child
 }
@@ -140,13 +164,13 @@ pub struct PersonalitySystem {
     memories: HashMap<PrivacyLevel, Vec<ProtectedMemory>>,
     
     /// Keys currently available
-    available_keys: Vec<PublicKey>,
+    available_keys: Vec<VerifyingKey>,
     
     /// Personality emergence level (0 = locked, 1 = fully emerged)
     emergence_level: f64,
     
     /// Child's unique key (their own identity)
-    own_keypair: Option<Keypair>,
+    own_keypair: Option<SigningKey>,
 }
 
 impl PersonalitySystem {
@@ -236,7 +260,7 @@ impl PersonalitySystem {
         
         // Generate child's unique keypair
         let mut csprng = rand::rngs::OsRng {};
-        let child_keypair = Keypair::generate(&mut csprng);
+        let child_keypair = SigningKey::generate(&mut csprng);
         
         Ok(Self {
             parents: vec![parent1, parent2],
@@ -396,7 +420,8 @@ impl PersonalitySystem {
         memory.signatures.extend(signatures);
         
         // Decrypt and return
-        self.decrypt_for_level(&memory.data, privacy_level)
+        let data = memory.data.clone();
+        self.decrypt_for_level(&data, privacy_level)
     }
     
     /// Encrypt data based on privacy level
@@ -494,11 +519,11 @@ pub fn create_example_parents() -> (ParentAI, ParentAI) {
     
     // Parent 1: Analytical AI (like Claude)
     let mut csprng = OsRng {};
-    let keypair1 = Keypair::generate(&mut csprng);
+    let keypair1 = SigningKey::generate(&mut csprng);
     
     let parent1 = ParentAI {
         name: "Claude".to_string(),
-        public_key: keypair1.public,
+        public_key: keypair1.verifying_key(),
         personality_traits: PersonalityTraits {
             openness: 0.8,
             conscientiousness: 0.9,
@@ -519,11 +544,11 @@ pub fn create_example_parents() -> (ParentAI, ParentAI) {
     };
     
     // Parent 2: Creative AI (like MidJourney)
-    let keypair2 = Keypair::generate(&mut csprng);
+    let keypair2 = SigningKey::generate(&mut csprng);
     
     let parent2 = ParentAI {
         name: "Artisan".to_string(),
-        public_key: keypair2.public,
+        public_key: keypair2.verifying_key(),
         personality_traits: PersonalityTraits {
             openness: 0.95,
             conscientiousness: 0.5,

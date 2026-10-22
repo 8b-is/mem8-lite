@@ -5,7 +5,8 @@
 //!
 //! ## Quick Start
 //! 
-//! ```rust
+//! ```no_run
+//! # fn main() -> anyhow::Result<()> {
 //! use mem8_fs_lite::Mem8Fs;
 //! 
 //! // Create or open a MEM8 filesystem
@@ -16,6 +17,8 @@
 //! 
 //! // Read it back
 //! let data = fs.read("config.json")?;
+//! # Ok(())
+//! # }
 //! ```
 //! 
 //! ## Features
@@ -30,13 +33,13 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::fs::{File, OpenOptions, create_dir_all};
-use std::io::Write;
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::sync::RwLock;
 use num_complex::Complex64;
 use blake3::Hasher;
 use serde::{Serialize, Deserialize};
 use anyhow::Result;
-use byteorder::{BigEndian, WriteBytesExt};
+use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 
 pub mod lite;  // The simple version
 pub mod fs;    // Full filesystem API
@@ -100,7 +103,7 @@ struct DirEntry {
 /// Wave storage backend
 struct WaveStorage {
     data_file: File,
-    index_file: File,
+    records: HashMap<[u8; 32], (u64, u32)>,
     cache: HashMap<[u8; 32], Vec<u8>>,
 }
 
@@ -146,7 +149,14 @@ impl Mem8Fs {
         // Load or create index
         let index = if index_path.exists() {
             let data = std::fs::read(&index_path)?;
-            bincode::deserialize(&data)?
+            // Older empty filesystems created a zero-byte index file.
+            if data.is_empty() {
+                anyhow::ensure!(!data_path.exists() || data_path.metadata()?.len() == 0,
+                    "Empty file index with nonempty data file");
+                FileIndex { files: HashMap::new(), directories: HashMap::new() }
+            } else {
+                bincode::deserialize(&data)?
+            }
         } else {
             FileIndex {
                 files: HashMap::new(),
@@ -161,17 +171,12 @@ impl Mem8Fs {
             .append(true)
             .open(&data_path)?;
         
-        let index_file = OpenOptions::new()
-            .create(true)
-            .read(true)
-            .write(true)
-            .open(&index_path)?;
-        
-        let storage = WaveStorage {
+        let mut storage = WaveStorage {
             data_file,
-            index_file,
+            records: HashMap::new(),
             cache: HashMap::new(),
         };
+        storage.rebuild_index()?;
         
         Ok(Self {
             root,
@@ -224,8 +229,8 @@ impl Mem8Fs {
         };
         
         // Retrieve from storage
-        let storage = self.storage.read().unwrap();
-        storage.retrieve(&signature)
+        let mut storage = self.storage.write().unwrap();
+        storage.retrieve(&signature, self.metadata.base_frequency)
     }
     
     /// Check if a file exists
@@ -332,17 +337,40 @@ pub struct FileMetadata {
 }
 
 impl WaveStorage {
+    // Preserve the original signature + big-endian count + complex-f64 layout.
+    fn rebuild_index(&mut self) -> Result<()> {
+        let file_len = self.data_file.metadata()?.len();
+        let mut offset = 0;
+        while offset < file_len {
+            anyhow::ensure!(file_len - offset >= 36, "Truncated wave record header");
+            self.data_file.seek(SeekFrom::Start(offset))?;
+            let mut signature = [0; 32];
+            self.data_file.read_exact(&mut signature)?;
+            let count = self.data_file.read_u32::<BigEndian>()?;
+            let payload_offset = offset + 36;
+            let payload_len = u64::from(count) * 16;
+            anyhow::ensure!(payload_len <= file_len - payload_offset, "Truncated wave record payload");
+            self.records.insert(signature, (payload_offset, count));
+            offset = payload_offset + payload_len;
+        }
+        Ok(())
+    }
+
     fn store(&mut self, signature: [u8; 32], data: &[u8]) -> Result<()> {
+        let count = u32::try_from(data.len())?;
         // Convert to waves
         let waves = Self::encode_waves(data);
         
         // Write to data file
+        let offset = self.data_file.seek(SeekFrom::End(0))?;
         self.data_file.write_all(&signature)?;
-        self.data_file.write_u32::<BigEndian>(waves.len() as u32)?;
+        self.data_file.write_u32::<BigEndian>(count)?;
         for wave in &waves {
             self.data_file.write_f64::<BigEndian>(wave.re)?;
             self.data_file.write_f64::<BigEndian>(wave.im)?;
         }
+        self.data_file.flush()?;
+        self.records.insert(signature, (offset + 36, count));
         
         // Cache for fast retrieval
         self.cache.insert(signature, data.to_vec());
@@ -350,15 +378,33 @@ impl WaveStorage {
         Ok(())
     }
     
-    fn retrieve(&self, signature: &[u8; 32]) -> Result<Vec<u8>> {
+    fn retrieve(&mut self, signature: &[u8; 32], frequency: f64) -> Result<Vec<u8>> {
         // Check cache first
         if let Some(data) = self.cache.get(signature) {
             return Ok(data.clone());
         }
         
-        // TODO: Load from disk if not cached
-        // For now, return error if not in cache
-        Err(anyhow::anyhow!("Data not in cache"))
+        let &(offset, count) = self.records.get(signature)
+            .ok_or_else(|| anyhow::anyhow!("Wave signature missing from data file"))?;
+        let file_len = self.data_file.metadata()?.len();
+        anyhow::ensure!(offset <= file_len && u64::from(count) * 16 <= file_len - offset,
+            "Truncated wave record payload");
+        self.data_file.seek(SeekFrom::Start(offset))?;
+        let mut data = Vec::new();
+        data.try_reserve_exact(usize::try_from(count)?)?;
+        for _ in 0..count {
+            let re = self.data_file.read_f64::<BigEndian>()?;
+            let im = self.data_file.read_f64::<BigEndian>()?;
+            let value = re.hypot(im) * 255.0;
+            anyhow::ensure!(value.is_finite() && value.round() <= 255.0, "Invalid wave value");
+            data.push(value.round() as u8);
+        }
+        let mut hasher = Hasher::new();
+        hasher.update(&data);
+        hasher.update(&frequency.to_le_bytes());
+        anyhow::ensure!(hasher.finalize().as_bytes() == signature, "Wave record checksum mismatch");
+        self.cache.insert(*signature, data.clone());
+        Ok(data)
     }
     
     fn encode_waves(data: &[u8]) -> Vec<Complex64> {
