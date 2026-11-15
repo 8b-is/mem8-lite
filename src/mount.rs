@@ -122,7 +122,7 @@ impl Filesystem for Mem8FuseFs {
         }
     }
     
-    fn getattr(&mut self, _req: &Request, ino: u64, reply: ReplyAttr) {
+    fn getattr(&mut self, _req: &Request, ino: u64, _fh: Option<u64>, reply: ReplyAttr) {
         if ino == FUSE_ROOT_ID {
             let attr = self.make_dir_attr(FUSE_ROOT_ID);
             reply.attr(&self.ttl, &attr);
@@ -181,8 +181,8 @@ impl Filesystem for Mem8FuseFs {
         }
         
         let mut entries = vec![
-            (FUSE_ROOT_ID, FileType::Directory, "."),
-            (FUSE_ROOT_ID, FileType::Directory, ".."),
+            (FUSE_ROOT_ID, FileType::Directory, ".".to_owned()),
+            (FUSE_ROOT_ID, FileType::Directory, "..".to_owned()),
         ];
         
         // List all files
@@ -190,7 +190,8 @@ impl Filesystem for Mem8FuseFs {
             for file in files {
                 let name = file.file_name()
                     .and_then(|n| n.to_str())
-                    .unwrap_or("unknown");
+                    .unwrap_or("unknown")
+                    .to_owned();
                 let inode = self.get_or_create_inode(file.to_str().unwrap_or(""));
                 entries.push((inode, FileType::RegularFile, name));
             }
